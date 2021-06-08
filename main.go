@@ -2,30 +2,33 @@ package main
 
 import (
 	"fmt"
-	"math/rand"
 	"os"
+	"time"
 
-	"moul.io/motd"
-	"moul.io/srand"
-	"moul.io/u"
-	"moul.io/zapconfig"
+	"github.com/pquerna/otp/totp"
+	"go.uber.org/multierr"
 )
 
 func main() {
-	if err := run(os.Args); err != nil {
+	if err := run(os.Args[1:]); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
 func run(args []string) error {
-	rand.Seed(srand.Fast())
-	fmt.Print(motd.Default())
-	logger, err := zapconfig.Configurator{}.Build()
-	if err != nil {
-		return err
+	if len(args) < 1 {
+		return fmt.Errorf("usage: totp-cli <TOKEN...>") // nolint:goerr113
 	}
-	logger.Info("Hello World!")
-	fmt.Println("args", u.JSON(args))
-	return nil
+	now := time.Now()
+	var errs error
+	for _, arg := range args {
+		code, err := totp.GenerateCode(arg, now)
+		if err != nil {
+			errs = multierr.Append(errs, fmt.Errorf("%q: %w", arg, err))
+		} else {
+			fmt.Println(code)
+		}
+	}
+	return errs
 }
